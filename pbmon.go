@@ -30,7 +30,7 @@ type PastebinMonitor struct {
 }
 
 // New constructs a pastebin monitor.
-func (p *PastebinMonitor) New(opts ...func(*PastebinMonitor) error) (*PastebinMonitor, error) {
+func New(opts ...func(*PastebinMonitor) error) (*PastebinMonitor, error) {
 	cache, err := bigcache.NewBigCache(bigcache.DefaultConfig(defaultEvictionDuration))
 	if err != nil {
 		return nil, err
