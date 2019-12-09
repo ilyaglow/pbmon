@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/allegro/bigcache"
 	pastebin "github.com/dutchcoders/gopastebin"
 )
 
@@ -23,25 +22,19 @@ type OnNewPaste func(pastebin.Paste, io.ReadCloser) error
 
 // PastebinMonitor handles monitoring of the pastebin.com
 type PastebinMonitor struct {
-	cache    *bigcache.BigCache
-	timeout  time.Duration
-	pbClient *pastebin.PastebinClient
-	OnNew    OnNewPaste
+	prevPastes []string
+	timeout    time.Duration
+	pbClient   *pastebin.PastebinClient
+	OnNew      OnNewPaste
 }
 
 // New constructs a pastebin monitor.
 func New(opts ...func(*PastebinMonitor) error) (*PastebinMonitor, error) {
-	cache, err := bigcache.NewBigCache(bigcache.DefaultConfig(defaultEvictionDuration))
-	if err != nil {
-		return nil, err
-	}
-
 	baseURL, _ := url.Parse("https://scrape.pastebin.com/")
 	pc := pastebin.New(baseURL)
 
 	conf := &PastebinMonitor{
 		pbClient: pc,
-		cache:    cache,
 		timeout:  DefaultTimeout,
 		OnNew: func(p pastebin.Paste, r io.ReadCloser) error {
 			log.Printf("title=%s user=%s syntax=%s url=%s ", p.Title, p.User, p.Syntax, p.FullURL)
@@ -86,36 +79,29 @@ func (p *PastebinMonitor) Do(recentSize int, timeout time.Duration) error {
 }
 
 func (p *PastebinMonitor) fetchNewPastes(recentSize int) ([]pastebin.Paste, error) {
-	var newPastes []pastebin.Paste
 	pastes, err := p.recent(recentSize)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, paste := range pastes {
-		v, err := p.cache.Get(paste.Key)
-		switch err {
-		case nil:
-			if string(v) == paste.Date.String() {
-				continue
-			}
-			err = p.cache.Set(paste.Key, []byte(paste.Date.String()))
-			if err != nil {
-				return newPastes, err
-			}
-			newPastes = append(newPastes, paste)
-		case bigcache.ErrEntryNotFound:
-			err = p.cache.Set(paste.Key, []byte(paste.Date.String()))
-			if err != nil {
-				return newPastes, err
-			}
-			newPastes = append(newPastes, paste)
-		default:
-			return newPastes, err
+	if p.prevPastes == nil {
+		for _, paste := range pastes {
+			p.prevPastes = append(p.prevPastes, paste.Key)
 		}
+		return nil, nil
 	}
 
-	return newPastes, nil
+	var newPrevPastes []string
+	matchPos := 0
+	for i := range pastes {
+		if pastes[i].Key == p.prevPastes[0] {
+			matchPos = i
+		}
+		newPrevPastes = append(newPrevPastes, pastes[i].Key)
+	}
+	p.prevPastes = newPrevPastes
+
+	return pastes[0:matchPos], nil
 }
 
 func (p *PastebinMonitor) processPaste(paste pastebin.Paste) error {
