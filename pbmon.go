@@ -2,6 +2,7 @@ package pbmon
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -22,10 +23,10 @@ type OnNewPaste func(pastebin.Paste, io.ReadCloser) error
 
 // PastebinMonitor handles monitoring of the pastebin.com
 type PastebinMonitor struct {
-	prevPastes []string
-	timeout    time.Duration
-	pbClient   *pastebin.PastebinClient
-	OnNew      OnNewPaste
+	topKey   string
+	timeout  time.Duration
+	pbClient *pastebin.PastebinClient
+	OnNew    OnNewPaste
 }
 
 // New constructs a pastebin monitor.
@@ -84,22 +85,22 @@ func (p *PastebinMonitor) fetchNewPastes(recentSize int) ([]pastebin.Paste, erro
 		return nil, err
 	}
 
-	if p.prevPastes == nil {
-		for _, paste := range pastes {
-			p.prevPastes = append(p.prevPastes, paste.Key)
-		}
+	if len(pastes) == 0 {
+		return nil, errors.New("no pastes available")
+	}
+
+	if p.topKey == "" { // it's a first run, so nothing new
+		p.topKey = pastes[0].Key
 		return nil, nil
 	}
 
-	var newPrevPastes []string
-	matchPos := 0
+	matchPos := len(pastes) - 1
 	for i := range pastes {
-		if pastes[i].Key == p.prevPastes[0] {
+		if pastes[i].Key == p.topKey {
 			matchPos = i
 		}
-		newPrevPastes = append(newPrevPastes, pastes[i].Key)
 	}
-	p.prevPastes = newPrevPastes
+	p.topKey = pastes[0].Key
 
 	return pastes[0:matchPos], nil
 }
