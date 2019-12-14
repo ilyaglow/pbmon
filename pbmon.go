@@ -1,3 +1,6 @@
+// Package pbmon aims to be a simple handy abstraction based on
+// github.com/dutchcoders/gopastebin. It allows user to do whatever she wants
+// with a new available paste.
 package pbmon
 
 import (
@@ -13,9 +16,9 @@ import (
 )
 
 const (
-	DefaultRecentSize       = 50
+	DefaultRecentSize       = 50 // Amount of pastes to get on one request
 	defaultEvictionDuration = 10 * time.Minute
-	DefaultTimeout          = 10 * time.Second
+	DefaultTimeout          = 10 * time.Second // Timeout between poll requests.
 )
 
 // OnNewPaste is a callback function for processing a new paste.
@@ -54,7 +57,7 @@ func New(opts ...func(*PastebinMonitor) error) (*PastebinMonitor, error) {
 }
 
 // Do starts fetching new pastes.
-// It doesn't care about old pastes, so you will get pastes callbacks after a
+// It doesn't care about old pastes, so you will get a first callback after a
 // specified timeout passed.
 func (p *PastebinMonitor) Do(recentSize int, timeout time.Duration) error {
 	_, err := p.fetchNewPastes(recentSize)
