@@ -1,0 +1,15 @@
+language: go
+
+go:
+  - master
+
+services:
+  - docker
+
+env:
+  global:
+    - GO111MODULE=on GOOS=linux GOARCH=amd64
+
+script:
+  - go build ./...
+  - docker build -t badcapt .
