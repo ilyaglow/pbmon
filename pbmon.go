@@ -115,44 +115,50 @@ func SetStateFile(fullLoc string) func(*PastebinMonitor) error {
 }
 
 // Do starts fetching new pastes.
-// It doesn't care about old pastes, so you will get a first callback after a
-// specified timeout passed.
 func (p *PastebinMonitor) Do(recentSize int, timeout time.Duration) error {
-	_, err := p.fetchNewPastes(recentSize)
+	err := p.do(recentSize, timeout)
 	if err != nil {
-		return fmt.Errorf("first fetch new pastes: %w", err)
+		return err
 	}
 
 	t := time.NewTicker(timeout)
 	for range t.C {
-		pastes, err := p.fetchNewPastes(recentSize)
+		err = p.do(recentSize, timeout)
 		if err != nil {
-			return fmt.Errorf("fetch by ticker: %w", err)
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *PastebinMonitor) do(recentSize int, timeout time.Duration) error {
+	pastes, err := p.fetchNewPastes(recentSize)
+	if err != nil {
+		return fmt.Errorf("fetch pastes: %w", err)
+	}
+
+	for i := len(pastes) - 1; i >= 0; i-- {
+		err := p.processPaste(pastes[i])
+		if err != nil {
+			return fmt.Errorf("process paste: %w", err)
 		}
 
-		for i := len(pastes) - 1; i >= 0; i-- {
-			err := p.processPaste(pastes[i])
-			if err != nil {
-				return fmt.Errorf("process paste: %w", err)
-			}
-
-			err = p.stateFile.Truncate(0)
-			if err != nil {
-				return fmt.Errorf("truncate %s: %w", p.stateFile.Name(), err)
-			}
-
-			_, err = p.stateFile.Seek(0, 0)
-			if err != nil {
-				return fmt.Errorf("seek to the beginning of %s: %w", p.stateFile.Name(), err)
-			}
-
-			_, err = p.stateFile.WriteString(pastes[i].Key)
-			if err != nil {
-				return fmt.Errorf("save state to %s: %w", p.stateFile.Name(), err)
-			}
-
-			p.topKey = pastes[i].Key
+		err = p.stateFile.Truncate(0)
+		if err != nil {
+			return fmt.Errorf("truncate %s: %w", p.stateFile.Name(), err)
 		}
+
+		_, err = p.stateFile.Seek(0, 0)
+		if err != nil {
+			return fmt.Errorf("seek to the beginning of %s: %w", p.stateFile.Name(), err)
+		}
+
+		_, err = p.stateFile.WriteString(pastes[i].Key)
+		if err != nil {
+			return fmt.Errorf("save state to %s: %w", p.stateFile.Name(), err)
+		}
+
+		p.topKey = pastes[i].Key
 	}
 	return nil
 }
