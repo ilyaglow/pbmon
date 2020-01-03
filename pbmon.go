@@ -116,14 +116,14 @@ func SetStateFile(fullLoc string) func(*PastebinMonitor) error {
 
 // Do starts fetching new pastes.
 func (p *PastebinMonitor) Do(recentSize int, timeout time.Duration) error {
-	err := p.do(recentSize, timeout)
+	err := p.do(recentSize)
 	if err != nil {
 		return err
 	}
 
 	t := time.NewTicker(timeout)
 	for range t.C {
-		err = p.do(recentSize, timeout)
+		err = p.do(recentSize)
 		if err != nil {
 			return err
 		}
@@ -131,7 +131,7 @@ func (p *PastebinMonitor) Do(recentSize int, timeout time.Duration) error {
 	return nil
 }
 
-func (p *PastebinMonitor) do(recentSize int, timeout time.Duration) error {
+func (p *PastebinMonitor) do(recentSize int) error {
 	pastes, err := p.fetchNewPastes(recentSize)
 	if err != nil {
 		return fmt.Errorf("fetch pastes: %w", err)
